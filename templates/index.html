@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediScan - AI Diagnostic Suite</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">⬡ MediScan</div>
+            <p>Gemini-powered Diagnostic Suite</p>
+        </header>
+        
+        <main>
+            <div class="upload-section" id="upload-zone">
+                <input type="file" id="file-input" accept="image/*,application/pdf" hidden>
+                <div class="drop-area">
+                    <div class="icon">📄</div>
+                    <h3>Drag & drop a medical scan</h3>
+                    <p>or click to browse (Image or PDF)</p>
+                </div>
+            </div>
+
+            <div class="loading-state" id="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing scan... Please wait.</p>
+            </div>
+
+            <div class="results-container" id="results-container" style="display: none;">
+                <div class="diagnosis-card glow">
+                    <h2>Diagnosis</h2>
+                    <div class="tags">
+                        <span class="tag" id="severity-tag"></span>
+                        <span class="tag" id="urgency-tag"></span>
+                    </div>
+                    <p id="diagnosis-text"></p>
+                </div>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Affected Regions</h3>
+                        <ul id="regions-list"></ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Clinical Findings</h3>
+                        <ul id="findings-list"></ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Recommendations</h3>
+                        <ul id="recommendations-list"></ul>
+                    </div>
+                </div>
+
+                <div class="card exercises-card">
+                    <h3>Recommended Exercises</h3>
+                    <div class="exercises-grid" id="exercises-grid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const loadingState = document.getElementById('loading-state');
+        const resultsContainer = document.getElementById('results-container');
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if(e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            uploadZone.style.display = 'none';
+            resultsContainer.style.display = 'none';
+            loadingState.style.display = 'flex';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if(!response.ok) throw new Error(data.error || 'API Error');
+                
+                displayResults(data);
+            } catch (err) {
+                alert('Analysis failed: ' + err.message);
+                uploadZone.style.display = 'block';
+                loadingState.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            loadingState.style.display = 'none';
+            resultsContainer.style.display = 'flex';
+            
+            document.getElementById('diagnosis-text').textContent = data.diagnosis;
+            
+            const sevTag = document.getElementById('severity-tag');
+            sevTag.textContent = `Severity: ${data.severity}`;
+            sevTag.className = `tag severity-${data.severity}`;
+            
+            const urgTag = document.getElementById('urgency-tag');
+            urgTag.textContent = `Urgency: ${data.urgency}`;
+            urgTag.className = `tag urgency-${data.urgency}`;
+
+            populateList('regions-list', data.affected_regions);
+            populateList('findings-list', data.findings);
+            populateList('recommendations-list', data.recommendations);
+
+            const exercisesGrid = document.getElementById('exercises-grid');
+            exercisesGrid.innerHTML = '';
+            if(data.exercises && data.exercises.length) {
+                data.exercises.forEach(ex => {
+                    const exCard = document.createElement('div');
+                    exCard.className = 'exercise-item';
+                    exCard.innerHTML = `
+                        <h4>${ex.name}</h4>
+                        <span class="ex-difficulty ${ex.difficulty}">${ex.difficulty}</span>
+                        <p class="ex-purpose">${ex.purpose}</p>
+                        <div class="ex-meta">
+                            <span>⏱️ ${ex.duration}</span>
+                            <span>🔄 ${ex.reps}</span>
+                        </div>
+                    `;
+                    exercisesGrid.appendChild(exCard);
+                });
+            } else {
+                exercisesGrid.innerHTML = '<p>No exercises recommended.</p>';
+            }
+        }
+
+        function populateList(id, items) {
+            const ul = document.getElementById(id);
+            ul.innerHTML = '';
+            if(items) {
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    ul.appendChild(li);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+mock_xray*.png
+body_map_output.png
+*.mp4
